@@ -1,0 +1,313 @@
+% This function calculates the discrete weigthed Laplacian for various boundry counditions (bc), including
+
+% bc=3 Neumann boundary (nbc) all sides
+% bc=1 nbc top and bottom
+% bc=2 Dirichlet
+% bc=0 no boundary; ie wrap
+
+function L=wlap(b, hc, hh, hv, bc)
+
+x=(min(b(:, 1)):b(1, 3):(max(b(:, 1))+b(1, 3)))'; 
+y=(min(b(:, 2)):b(1, 4):(max(b(:, 2))+b(1, 4)))';
+
+
+
+%% finite different on the GAIO box b
+%setup
+%hc=Huc;
+%hh=Huh;
+%hv=Huv;
+N=length(unique(b(:, 1)));
+M=length(unique(b(:, 2)));
+nm=N*M;
+dx=2*b(1, 3);
+dy=2*b(1, 4);
+
+
+%% discrete Laplacian calculation
+
+% filling out the actifical cells for h_\mu
+% wrap in the horizonal direction and reflect on the vertical
+    
+
+ if bc==1 || bc==3
+  hv2=[0 hv(2,:) 0;
+      hv(:, N) hv hv(:, 1);
+      0 hv(M-1, :) 0];
+  hh2=[0 hh(2,:) 0;
+      hh(:, N) hh hh(:, 1);
+      0 hh(M-1,:) 0];
+  hc2=[0 hc(2,:) 0;
+      hc(:, N) hc hc(:, 1);
+      0 hc(M-1,:) 0];
+ elseif bc==2
+   hv2=[0 hv(1, :) 0;
+      hv(:,1) hv hv(:,N);
+      0 hv(M, :) 0];
+   hh2=[0 hh(1, :) 0;
+      hh(:,1) hh hh(:,N);
+      0 hh(M, :) 0];  
+   hc2=[0 hc(1, :) 0;
+      hc(:,1) hc hc(:,N);
+      0 hc(M, :) 0]; 
+ elseif bc==0
+   hv2=[hv(M,N) hv(M, :) hv(M, 1);
+        hv(:,N) hv       hv(:,1);
+        hv(1,N) hv(1, :) hv(1,1)];
+   hh2=[hh(M,N) hh(M, :) hh(M, 1);
+        hh(:,N) hh       hh(:,1);
+        hh(1,N) hh(1, :) hh(1,1)]; 
+   hc2=[hc(M,N) hc(M, :) hc(M, 1);
+        hc(:,N) hc       hc(:,1);
+        hc(1,N) hc(1, :) hc(1,1)];
+ end    
+
+% note matlab circshift "1" is to the right/bottom; i.e [1 2 3 4]\to [4 1 2 3]
+% also "1" in circshift is in the vertical direction
+% calculating the values of the density-terms at the cell blocks adjacent to
+% center
+
+% shifting to the right here, because at index i, the value of hv/hh
+% corresponds to the top/right of box edge. 
+Hc2=-(hv2+circshift(hv2, -1, 1))./(4*dy^2*hc2)...
+   -(hh2+circshift(hh2, -1, 2))./(4*dx^2*hc2);  
+Ht2=circshift(hv2, -1, 1)./(4*dy^2*hc2);
+Hb2=hv2./(4*dy^2*hc2);
+Hl2=hh2./(4*dx^2*hc2);
+Hr2=circshift(hh2, -1, 2)./(4*dx^2*hc2);
+
+Hc=Hc2(2:end-1,2:end-1);
+Ht=Ht2(2:end-1,2:end-1);
+Hb=Hb2(2:end-1,2:end-1);
+Hl=Hl2(2:end-1,2:end-1);
+Hr=Hr2(2:end-1,2:end-1);
+% else
+%     Hc=Hc2;
+%     Ht=Ht2;
+%     Hb=Hb2;
+%     Hl=Hl2;
+%     Hr=Hr2;
+
+Hcc=reshape(Hc', nm, 1);
+L=sparse(1:nm, 1:nm, Hcc, nm, nm);
+
+if bc==1;
+ for jj=1:M;
+     for ii=1:N;
+        if ii==1; %left boundary
+            if jj==1; %bottom left corner
+                L(ii+N*(jj-1), ii+N*(jj-1)+1)=Hr(jj, ii)/2;
+                L(ii+N*(jj-1), ii+N*(jj-1)+N-1)=Hl(jj, ii)/2;
+                L(ii+N*(jj-1), ii+N*(jj-1)+N)=(Hb(jj, ii)+Ht(jj, ii))/2;
+                L(ii+N*(jj-1), ii+N*(jj-1))=L(ii+N*(jj-1), ii+N*(jj-1))/2;
+            elseif jj==M; %top left corner
+                L(ii+N*(jj-1), ii+N*(jj-1)+1)=Hr(jj, ii)/2;
+                L(ii+N*(jj-1), ii+N*(jj-1)+N-1)=Hl(jj, ii)/2;
+                L(ii+N*(jj-1), ii+N*(jj-1)-N)=(Hb(jj, ii)+Ht(jj, ii))/2;
+                L(ii+N*(jj-1), ii+N*(jj-1))=L(ii+N*(jj-1), ii+N*(jj-1))/2;
+            else 
+                L(ii+N*(jj-1), ii+N*(jj-1)+1)=Hr(jj, ii);
+                L(ii+N*(jj-1), ii+N*(jj-1)+N-1)=Hl(jj, ii);
+                L(ii+N*(jj-1), ii+N*(jj-1)+N)=Ht(jj, ii);
+                L(ii+N*(jj-1), ii+N*(jj-1)-N)=Hb(jj, ii);
+                L(ii+N*(jj-1), ii+N*(jj-1))=L(ii+N*(jj-1), ii+N*(jj-1));
+            end
+        elseif ii==N; %right boundary
+            if jj==1; %bottom right corner
+                L(ii+N*(jj-1), ii+N*(jj-1)-N+1)=Hr(jj, ii)/2;
+                L(ii+N*(jj-1), ii+N*(jj-1)-1)=Hl(jj, ii)/2;
+                L(ii+N*(jj-1), ii+N*(jj-1)+N)=(Hb(jj, ii)+Ht(jj, ii))/2;
+                L(ii+N*(jj-1), ii+N*(jj-1))=L(ii+N*(jj-1), ii+N*(jj-1))/2;
+            elseif jj==M; %top right corner
+                L(ii+N*(jj-1), ii+N*(jj-1)-N+1)=Hr(jj, ii)/2;
+                L(ii+N*(jj-1), ii+N*(jj-1)-1)=Hl(jj, ii)/2;
+                L(ii+N*(jj-1), ii+N*(jj-1)-N)=(Hb(jj, ii)+Ht(jj, ii))/2;
+                L(ii+N*(jj-1), ii+N*(jj-1))=L(ii+N*(jj-1), ii+N*(jj-1))/2;
+            else
+                L(ii+N*(jj-1), ii+N*(jj-1)-N+1)=Hr(jj, ii);
+                L(ii+N*(jj-1), ii+N*(jj-1)-1)=Hl(jj, ii);
+                L(ii+N*(jj-1), ii+N*(jj-1)+N)=Ht(jj, ii);
+                L(ii+N*(jj-1), ii+N*(jj-1)-N)=Hb(jj, ii);
+                L(ii+N*(jj-1), ii+N*(jj-1))=L(ii+N*(jj-1), ii+N*(jj-1));
+            end
+        elseif jj==1;%bottom boundary
+            L(ii+N*(jj-1), ii+N*(jj-1)+N)=(Hb(jj,ii)+Ht(jj, ii))/2;
+            L(ii+N*(jj-1), ii+N*(jj-1)-1)=Hl(jj, ii)/2;
+            L(ii+N*(jj-1), ii+N*(jj-1)+1)=Hr(jj, ii)/2;
+            L(ii+N*(jj-1), ii+N*(jj-1))=L(ii+N*(jj-1), ii+N*(jj-1))/2;
+        elseif jj==M;%top boundary
+            L(ii+N*(jj-1), ii+N*(jj-1)-N)=(Hb(jj,ii)+Ht(jj, ii))/2;
+            L(ii+N*(jj-1), ii+N*(jj-1)-1)=Hl(jj, ii)/2;
+            L(ii+N*(jj-1), ii+N*(jj-1)+1)=Hr(jj, ii)/2;
+            L(ii+N*(jj-1), ii+N*(jj-1))=L(ii+N*(jj-1), ii+N*(jj-1))/2;
+        else %interior
+            L(ii+N*(jj-1), ii+N*(jj-1)-1)=Hl(jj, ii);
+            L(ii+N*(jj-1), ii+N*(jj-1)+1)=Hr(jj, ii);
+            L(ii+N*(jj-1), ii+N*(jj-1)+N)=Ht(jj, ii);
+            L(ii+N*(jj-1), ii+N*(jj-1)-N)=Hb(jj, ii);
+        end
+    end
+ end
+elseif bc==2;
+for jj=1:M;
+     for ii=1:N;
+        if ii==1; %left boundary
+            if jj==1; %bottom left corner
+                L(ii+N*(jj-1), ii+N*(jj-1)+1)=Hr(jj, ii)*(Hb(jj+1,ii)/Ht(jj,ii));
+                L(ii+N*(jj-1), ii+N*(jj-1)+N)=Ht(jj, ii)*(Hb(jj+1,ii)/Ht(jj,ii));
+                L(ii+N*(jj-1), ii+N*(jj-1))=(-Hr(jj, ii)-Ht(jj, ii))*(Hb(jj+1,ii)/Ht(jj,ii));
+            elseif jj==M; %top left corner
+                L(ii+N*(jj-1), ii+N*(jj-1)+1)=Hr(jj, ii)*(Ht(jj-1,ii)/Hb(jj,ii));
+                L(ii+N*(jj-1), ii+N*(jj-1)-N)=Hb(jj, ii)*(Ht(jj-1,ii)/Hb(jj,ii));
+                L(ii+N*(jj-1), ii+N*(jj-1))=(-Hr(jj,ii)-Hb(jj,ii))*(Ht(jj-1,ii)/Hb(jj,ii));
+            else 
+                L(ii+N*(jj-1), ii+N*(jj-1)+1)=Hr(jj, ii);
+                L(ii+N*(jj-1), ii+N*(jj-1)+N)=Ht(jj, ii);
+                L(ii+N*(jj-1), ii+N*(jj-1)-N)=Hb(jj, ii);
+                L(ii+N*(jj-1), ii+N*(jj-1))=-Hr(jj, ii)-Ht(jj, ii)-Hb(jj, ii);
+            end
+        elseif ii==N; %right boundary
+            if jj==1; %bottom right corner
+                L(ii+N*(jj-1), ii+N*(jj-1)-1)=Hl(jj, ii)*(Hb(jj+1,ii)/Ht(jj,ii));
+                L(ii+N*(jj-1), ii+N*(jj-1)+N)=Ht(jj, ii)*(Hb(jj+1,ii)/Ht(jj,ii));
+                L(ii+N*(jj-1), ii+N*(jj-1))=(-Hl(jj,ii)-Ht(jj,ii))*(Hb(jj+1,ii)/Ht(jj,ii));
+            elseif jj==M; %top right corner
+                L(ii+N*(jj-1), ii+N*(jj-1)-1)=(Hl(jj, ii))*(Ht(jj-1,ii)/Hb(jj,ii));
+                L(ii+N*(jj-1), ii+N*(jj-1)-N)=(Hb(jj, ii))*(Ht(jj-1,ii)/Hb(jj,ii));
+                L(ii+N*(jj-1), ii+N*(jj-1))=(-Hl(jj,ii)-Hb(jj,ii))*(Ht(jj-1,ii)/Hb(jj,ii));
+            else
+                L(ii+N*(jj-1), ii+N*(jj-1)-1)=Hl(jj, ii);
+                L(ii+N*(jj-1), ii+N*(jj-1)+N)=Ht(jj, ii);
+                L(ii+N*(jj-1), ii+N*(jj-1)-N)=Hb(jj, ii);
+                L(ii+N*(jj-1), ii+N*(jj-1))=-Hl(jj,ii)-Ht(jj,ii)-Hb(jj,ii);
+            end
+        elseif jj==1;%bottom boundary
+            L(ii+N*(jj-1), ii+N*(jj-1)+N)=Ht(jj, ii)*(Hb(jj+1,ii)/Ht(jj,ii));
+            L(ii+N*(jj-1), ii+N*(jj-1)-1)=Hl(jj, ii)*(Hb(jj+1,ii)/Ht(jj,ii));
+            L(ii+N*(jj-1), ii+N*(jj-1)+1)=Hr(jj, ii)*(Hb(jj+1,ii)/Ht(jj,ii));
+            L(ii+N*(jj-1), ii+N*(jj-1))=(-Ht(jj,ii)-Hl(jj,ii)-Hr(jj,ii))*(Hb(jj+1,ii)/Ht(jj,ii));
+        elseif jj==M;%top boundary
+            L(ii+N*(jj-1), ii+N*(jj-1)-N)=Hb(jj,ii)*(Ht(jj-1,ii)/Hb(jj,ii));
+            L(ii+N*(jj-1), ii+N*(jj-1)-1)=Hl(jj, ii)*(Ht(jj-1,ii)/Hb(jj,ii));
+            L(ii+N*(jj-1), ii+N*(jj-1)+1)=Hr(jj, ii)*(Ht(jj-1,ii)/Hb(jj,ii));
+            L(ii+N*(jj-1), ii+N*(jj-1))=(-Hb(jj,ii)-Hl(jj,ii)-Hr(jj,ii))*(Ht(jj-1,ii)/Hb(jj,ii));
+        else %interior
+            L(ii+N*(jj-1), ii+N*(jj-1)-1)=Hl(jj, ii);
+            L(ii+N*(jj-1), ii+N*(jj-1)+1)=Hr(jj, ii);
+            L(ii+N*(jj-1), ii+N*(jj-1)+N)=Ht(jj, ii);
+            L(ii+N*(jj-1), ii+N*(jj-1)-N)=Hb(jj, ii);
+            L(ii+N*(jj-1), ii+N*(jj-1))=-Hb(jj,ii)-Hl(jj,ii)-Ht(jj,ii)-Hr(jj,ii);
+        end
+    end
+ end
+elseif bc==0
+     for jj=1:M;
+     for ii=1:N;
+        if ii==1; %left boundary
+            if jj==1; %bottom left corner
+            %L(ii+N*(jj-1), ii+N*(jj-1)-1+N)=0;%Hr(jj, ii)+Hl(jj, ii);
+                L(ii+N*(jj-1), ii+N*(jj-1)+nm-N)=Hb(jj, ii);
+                L(ii+N*(jj-1), ii+N*(jj-1)+N-1)=Hl(jj, ii);
+                L(ii+N*(jj-1), ii+N*(jj-1)+1)=Hr(jj, ii);
+                L(ii+N*(jj-1), ii+N*(jj-1)+N)=Ht(jj, ii);
+            elseif jj==M; %top left corner
+                L(ii+N*(jj-1), ii+N*(jj-1)-nm+N)=Ht(jj, ii);
+                L(ii+N*(jj-1), ii+N*(jj-1)+N-1)=Hl(jj, ii);
+                L(ii+N*(jj-1), ii+N*(jj-1)+1)=Hr(jj, ii);
+                L(ii+N*(jj-1), ii+N*(jj-1)-N)=Hb(jj, ii);
+            else
+                L(ii+N*(jj-1), ii+N*(jj-1)+N-1)=Hl(jj, ii);
+                L(ii+N*(jj-1), ii+N*(jj-1)+1)=Hr(jj, ii);
+                L(ii+N*(jj-1), ii+N*(jj-1)-N)=Hb(jj, ii);
+                L(ii+N*(jj-1), ii+N*(jj-1)+N)=Ht(jj, ii);
+            end
+        elseif ii==N; %right boundary
+            if jj==1; %bottom right corner
+                L(ii+N*(jj-1), ii+N*(jj-1)-N+1)=Hr(jj, ii);
+                L(ii+N*(jj-1), ii+N*(jj-1)+nm-N)=Hb(jj, ii);
+                L(ii+N*(jj-1), ii+N*(jj-1)-1)=Hl(jj, ii);
+                L(ii+N*(jj-1), ii+N*(jj-1)+N)=Ht(jj, ii);
+            elseif jj==M; %top right corner
+                L(ii+N*(jj-1), ii+N*(jj-1)-N+1)=Hr(jj, ii);
+                L(ii+N*(jj-1), ii+N*(jj-1)-nm+N)=Ht(jj, ii);
+                L(ii+N*(jj-1), ii+N*(jj-1)-1)=Hl(jj, ii);
+                L(ii+N*(jj-1), ii+N*(jj-1)-N)=Hb(jj, ii);
+            else
+                L(ii+N*(jj-1), ii+N*(jj-1)-N+1)=Hr(jj, ii);
+                L(ii+N*(jj-1), ii+N*(jj-1)-1)=Hl(jj, ii);
+                L(ii+N*(jj-1), ii+N*(jj-1)-N)=Hb(jj, ii);
+                L(ii+N*(jj-1), ii+N*(jj-1)+N)=Ht(jj, ii);
+            end
+        elseif jj==1;%bottom boundary
+            L(ii+N*(jj-1), ii+N*(jj-1)+nm-N)=Hb(jj, ii);
+            L(ii+N*(jj-1), ii+N*(jj-1)+N)=Ht(jj, ii);
+            L(ii+N*(jj-1), ii+N*(jj-1)-1)=Hl(jj, ii);
+            L(ii+N*(jj-1), ii+N*(jj-1)+1)=Hr(jj, ii);
+        elseif jj==M;%top boundary
+            L(ii+N*(jj-1), ii+N*(jj-1)-nm+N)=Ht(jj, ii);
+            L(ii+N*(jj-1), ii+N*(jj-1)-N)=Hb(jj,ii);
+            L(ii+N*(jj-1), ii+N*(jj-1)-1)=Hl(jj, ii);
+            L(ii+N*(jj-1), ii+N*(jj-1)+1)=Hr(jj, ii);
+        else %interior
+            L(ii+N*(jj-1), ii+N*(jj-1)-1)=Hl(jj, ii);
+            L(ii+N*(jj-1), ii+N*(jj-1)+1)=Hr(jj, ii);
+            L(ii+N*(jj-1), ii+N*(jj-1)-N)=Hb(jj, ii);
+            L(ii+N*(jj-1), ii+N*(jj-1)+N)=Ht(jj, ii);
+        end
+     end
+     end
+elseif bc==3
+     for jj=1:M;
+     for ii=1:N;
+        if ii==1; %left boundary
+            if jj==1; %bottom left corner
+                L(ii+N*(jj-1), ii+N*(jj-1)+1)=(Hr(jj, ii)+Hl(jj, ii))/4;
+                L(ii+N*(jj-1), ii+N*(jj-1)+N)=(Hb(jj, ii)+Ht(jj, ii))/4;
+                L(ii+N*(jj-1), ii+N*(jj-1))=L(ii+N*(jj-1), ii+N*(jj-1))/4;
+            elseif jj==M; %top left corner
+                L(ii+N*(jj-1), ii+N*(jj-1)+1)=(Hr(jj, ii)+Hl(jj, ii))/4;
+                L(ii+N*(jj-1), ii+N*(jj-1)-N)=(Hb(jj, ii)+Ht(jj, ii))/4;
+                L(ii+N*(jj-1), ii+N*(jj-1))=L(ii+N*(jj-1), ii+N*(jj-1))/4;
+            else 
+                L(ii+N*(jj-1), ii+N*(jj-1)+1)=Hr(jj, ii);
+                L(ii+N*(jj-1), ii+N*(jj-1)+N-1)=Hl(jj, ii);
+                L(ii+N*(jj-1), ii+N*(jj-1)+N)=Ht(jj, ii);
+                L(ii+N*(jj-1), ii+N*(jj-1)-N)=Hb(jj, ii);
+                L(ii+N*(jj-1), ii+N*(jj-1))=L(ii+N*(jj-1), ii+N*(jj-1));
+            end
+        elseif ii==N; %right boundary
+            if jj==1; %bottom right corner
+                L(ii+N*(jj-1), ii+N*(jj-1)-1)=(Hr(jj, ii)+Hl(jj, ii))/4;
+                L(ii+N*(jj-1), ii+N*(jj-1)+N)=(Hb(jj, ii)+Ht(jj, ii))/4;
+                L(ii+N*(jj-1), ii+N*(jj-1))=L(ii+N*(jj-1), ii+N*(jj-1))/4;
+            elseif jj==M; %top right corner
+                L(ii+N*(jj-1), ii+N*(jj-1)-1)=(Hr(jj, ii)+Hl(jj, ii))/4;
+                L(ii+N*(jj-1), ii+N*(jj-1)-N)=(Hb(jj, ii)+Ht(jj, ii))/4;
+                L(ii+N*(jj-1), ii+N*(jj-1))=L(ii+N*(jj-1), ii+N*(jj-1))/4;
+            else
+                L(ii+N*(jj-1), ii+N*(jj-1)-N+1)=Hr(jj, ii);
+                L(ii+N*(jj-1), ii+N*(jj-1)-1)=Hl(jj, ii);
+                L(ii+N*(jj-1), ii+N*(jj-1)+N)=Ht(jj, ii);
+                L(ii+N*(jj-1), ii+N*(jj-1)-N)=Hb(jj, ii);
+                L(ii+N*(jj-1), ii+N*(jj-1))=L(ii+N*(jj-1), ii+N*(jj-1));
+            end
+        elseif jj==1;%bottom boundary
+            L(ii+N*(jj-1), ii+N*(jj-1)+N)=(Hb(jj,ii)+Ht(jj, ii))/2;
+            L(ii+N*(jj-1), ii+N*(jj-1)-1)=Hl(jj, ii)/2;
+            L(ii+N*(jj-1), ii+N*(jj-1)+1)=Hr(jj, ii)/2;
+            L(ii+N*(jj-1), ii+N*(jj-1))=L(ii+N*(jj-1), ii+N*(jj-1))/2;
+        elseif jj==M;%top boundary
+            L(ii+N*(jj-1), ii+N*(jj-1)-N)=(Hb(jj,ii)+Ht(jj, ii))/2;
+            L(ii+N*(jj-1), ii+N*(jj-1)-1)=Hl(jj, ii)/2;
+            L(ii+N*(jj-1), ii+N*(jj-1)+1)=Hr(jj, ii)/2;
+            L(ii+N*(jj-1), ii+N*(jj-1))=L(ii+N*(jj-1), ii+N*(jj-1))/2;
+        else %interior
+            L(ii+N*(jj-1), ii+N*(jj-1)-1)=Hl(jj, ii);
+            L(ii+N*(jj-1), ii+N*(jj-1)+1)=Hr(jj, ii);
+            L(ii+N*(jj-1), ii+N*(jj-1)+N)=Ht(jj, ii);
+            L(ii+N*(jj-1), ii+N*(jj-1)-N)=Hb(jj, ii);
+        end
+    end
+ end
+    
+end
