@@ -1,0 +1,67 @@
+% Calculate the P matrix using GAIO
+% Generate the domain M
+
+%clean up
+clc; % Clear the command window.
+close all; % Close all figures (except those of imtool.)
+clear; % Erase all existing variables.
+
+%% loading tools
+addpath(genpath('/home/nfs/z3408773/Desktop/Computational/computational-manifold/GAIO-3.0'))
+addpath(genpath('/home/nfs/z3408773/Desktop/Computational/computational-manifold/tools'))
+
+f=@Lshearmap;
+
+
+
+% The number of test point in each grid box
+n = 20; X1 = linspace(-1+1/(2*n),1-1/(2*n),n)'; 
+[XX,YY] = meshgrid(X1,X1); X = [ XX(:) YY(:) ];
+
+% the tree (this is the grid) r is domain size, and c is center.
+c = [2 0.5]; r = [2 0.5]; t = Tree(c, r); 
+
+%d=depth, total number of grid points is 2^d, this handles square grid
+d=14; N=2^(d/2+1); M=2^(d/2-1); nm=N*M;
+
+%% subdivision algorithm
+
+
+sd = t.sd; depth=d; 
+%sd(d-1:d) = 0;
+%t.sd = sd;
+
+%subdeivide in the horizontal direction twice more (four times the...
+%resolution in that direction
+sdsd=zeros(d, 1);
+sdsd(1:((d-2)/2+2))=0;
+sdsd((d-2)/2+2+1: ((d-2)/2+2)+(d-2)/2)=1;
+t.sd=sdsd;%sd controls the dimensional of subdivide
+
+
+for i=1:depth,
+ t.set_flags('all', 8);
+    t.subdivide;
+end
+    
+b=t.boxes(d)';
+
+%transition probability matrix
+P =tpgraph_out(t, f, X, d)';
+
+%boxplot2(t); xlabel('x'); ylabel('y');
+
+delete(t);
+
+%% sorting data "b",
+
+% new format of b takes the form (x_1, y_1), (x_2, y_1), (x_N,y_1),...,(x_1, y_M), (x_N, y_M)
+
+
+[b, indb]=sortrows(b, [2, 1]);
+
+P=P(:, indb);
+P=P(indb, :);
+
+%saving data
+save('info', 'P', 'b', 'N', 'M', 'f')
