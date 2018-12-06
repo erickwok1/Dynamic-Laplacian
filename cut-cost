@@ -1,0 +1,215 @@
+% this script computes the cut cost
+close all
+Resultados='/home/nfs/z3408773//Desktop/moutput';
+f_2=real(V(:,3));
+
+ff_2=reshape(f_2, N, M)';
+tf_2=Kstar*f_2;
+tff_2=reshape(tf_2, N, M)';
+ff_2=[ff_2 ff_2(:, 1)];
+tff_2=[tff_2 tff_2(:, 1)];
+
+
+
+
+
+%contour(unique(b(:, 1)), unique(b(:, 2)), ff_2)
+ubx=unique(b(:,1));
+uby=unique(b(:,2));
+
+ax=[ubx; b(length(ubx), 1)+2*b(1, 3)];
+ay=[uby]; %max(b(:, 2))+2*b(1, 4)];
+
+tic
+%% =============== Isoperimetry Calculations =======================
+CR=zeros(nm, 1);
+a=zeros(nm, 1);
+ta=zeros(nm, 1);
+V_1=zeros(nm, 1);
+V_2=zeros(nm, 1);
+for ii=1: nm 
+if (round(f_2(ii), 4, 'significant')~=round(max(f_2),4, 'significant')...
+        && round(f_2(ii),4, 'significant')~=round(min(f_2), 4, 'significant')...
+        && round(tf_2(ii),4, 'significant')~=round(max(tf_2), 4, 'significant')...%this to avoid trival partition 
+        && round(tf_2(ii), 4, 'significant')~=round(min(tf_2), 4, 'significant')) 
+ 
+
+%contour map, coordinates of level sets C and TC;  position of level set Cp TCp
+C=contourc(ax, ay, ff_2, [f_2(ii), f_2(ii)]);
+%Cp=contourc(unique(b(:, 1)), unique(b(:, 2)), ff_2, [f_2(ii), f_2(ii)]);
+
+TC=contourc(ax, ay, tff_2, [f_2(ii), f_2(ii)]);
+%TCp=contourc(unique(b(:, 1)), unique(b(:, 2)), tff_2, [tf_2(ii), tf_2(ii)]);
+
+%% handles the space X
+
+%removing bad coordinate due to contourc function 
+%coC=floor(C(:,:))+1;
+for jj=1:length(C)
+    if C(1, jj)<min(ax) || C(1, jj)>max(ax) || C(2, jj)<min(ay) || C(2, jj)>max(ay);
+        C(:,jj)=inf;
+    end
+end
+C(:,C(1,:)==inf)=[];
+nC=[C(1,:)./(2*b(1, 3)); C(2,:)./(2*b(1, 4))];
+
+Co=floor(nC)+1;
+Co(1,Co(1,:)==N+1)=1;
+Co(2,Co(2,:)==M+1)=1;
+
+%length + volume of objects in X   
+dax=diff(C(1,:));
+day=diff(C(2,:));
+da=sqrt(dax.^2+day.^2);
+ 
+
+%dv=zeros(1, length(da));
+for jj=1:length(C)-1
+if (da(jj)>1.1*sqrt((2*b(1, 3))^2+(2*b(1, 4))^2))
+   da(jj)=0;
+else
+   da(jj)=da(jj)*(Huc(Co(2, jj), Co(1, jj)));
+   %da(jj)=(Hu(2*C(2, jj), 2*C(1, jj))); 
+end
+end
+a(ii)=sum(da);
+
+%index set of X_1
+indv1=find(f_2<=f_2(ii));
+iX_1=zeros(nm, 1);
+iX_1(indv1)=1;
+X_1=reshape(iX_1, M, N);
+hX_1=zeros(M, N);
+for kk=1:N
+    for jj=1:M
+        hX_1(jj, kk)=Huc(jj, kk)*X_1(jj, kk);
+    end
+end
+V_1(ii)=(sum(sum(hX_1)))*b(1, 3)*b(1, 4)*4;
+
+%index set of X_2
+indv2=find(f_2>f_2(ii));
+iX_2=zeros(nm, 1);
+iX_2(indv2)=1;
+X_2=reshape(iX_2, M, N);
+hX_2=zeros(M, N);
+for kk=1:N
+    for jj=1:M
+        hX_2(jj, kk)=Huc(jj, kk)*X_2(jj, kk);
+    end
+end
+V_2(ii)=(sum(sum(hX_2)))*b(1, 3)*b(1, 4)*4;
+
+
+%% handle the space TX
+
+%removing boxes due to bad contourc for TC
+for jj=1:length(TC)
+    if TC(1, jj)<min(ax) || TC(1, jj)>max(ax)  || TC(2, jj)<min(ay)  || TC(2, jj)>max(ay);
+        TC(:,jj)=inf;
+    end
+end
+TC(:,TC(1,:)==inf)=[];
+nTC=[TC(1,:)./(2*b(1, 3)); TC(2,:)./(2*b(1, 4))];
+
+TCo=floor(nTC)+1;
+TCo(1,TCo(1,:)==N+1)=1;
+TCo(2,TCo(2,:)==M+1)=1;
+
+%length + volume of objects in TX   
+datx=diff(TC(1,:));
+daty=diff(TC(2,:));
+dat=sqrt(datx.^2+daty.^2);
+
+ for jj=1:length(TC)-1
+ if (dat(jj)>1.2*sqrt((2*b(1, 3))^2+(2*b(1, 4))^2))
+    dat(jj)=0;
+ else
+    dat(jj)=dat(jj)*(Hnc(TCo(2, jj), TCo(1, jj))); 
+    %dat(jj)=(Hu(2*TC(2, jj), 2*TC(1, jj))); 
+ end
+ end
+ ta(ii)=sum(dat);
+
+
+
+%% Cheegar ratio calculation
+
+%CR=0.5*(a+ta)/(min(V_1, V_2));
+    if bad==1;
+        CR(ii)=((a(ii))/min(V_1(ii), V_2(ii))); 
+    else
+        CR(ii)=0.5*((a(ii)+ta(ii))/min(V_1(ii), V_2(ii)));
+    end
+end
+end
+toc
+
+
+CR(CR==0)=inf;
+CR(f_2>(3/4)*max(f_2))=inf;
+CR(f_2<(3/4)*min(f_2))=inf;
+kk=find(CR==min(CR));
+mCR=CR(kk);
+g_2=f_2(kk);
+mV_1=V_1(kk);
+mV_2=V_2(kk);
+ma=a(kk);
+mta=ta(kk);
+
+% order level surfaces acoording to cut cost in increaseing order
+[sortedCR, indCR]=sort(CR);
+gg_2=zeros(length(CR), 1);
+gg_2=f_2(indCR);
+plot(abs(gg_2(1:max(find(sortedCR~=inf)))));
+
+
+%% figures
+
+
+
+
+figure;
+%set(gcf,'position', [500 500 800 200]);
+
+%title('Level surface of f_2 in X')
+if weight~=0;
+contourf(ax, ay, [Huc Huc(:, 1)], 'linestyle', 'none', 'levellist', unique(Huc))
+caxis([min(min([Huc; Hnc])) max(max([Huc;Hnc]))]);
+colormap(flipud(summer))
+hold on;
+
+c=colorbar;%('southoutside');
+Ax = gca;
+axpos = Ax.Position;
+cpos = c.Position;
+cpos(3) = 0.5*cpos(3);
+c.Position = cpos;
+Ax.Position = axpos;
+c.Label.String = 'weight';
+end
+
+
+contour(ax, ay, ff_2, [g_2, g_2], 'linecolor', 'k', 'linewidth', 3)
+
+%xlabel('x_1') 
+%ylabel('x_2')
+
+
+
+filename='M';
+%title(sprintf(filename));
+hold off
+fullfilename=fullfile(Resultados, filename);
+if savedata==1;
+% pixels per inch
+set(gcf, 'PaperUnits', 'inches', 'PaperPosition', [0 0 12 3]);
+set(gca, 'FontSize',16);
+print(gcf, fullfilename, '-dpng');
+%saveas(gcf, fullfilename,'png')
+end
+%tff=zeros(1, length(coTCx));
+%for ii=1:length(coTCx)
+%    tff(ii)=ff_2(coTCy(ii), coTCx(ii));
+%end
+%tff_2=mean(tff)
