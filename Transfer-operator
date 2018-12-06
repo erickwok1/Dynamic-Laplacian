@@ -7,8 +7,7 @@ close all; % Close all figures (except those of imtool.)
 clear; % Erase all existing variables.
 
 %% loading tools
-addpath(genpath('/home/nfs/z3408773/Desktop/Computational/computational-manifold/GAIO-3.0'))
-addpath(genpath('/home/nfs/z3408773/Desktop/Computational/computational-manifold/tools'))
+
 
 f=@Lshearmap;
 
