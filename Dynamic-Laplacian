@@ -1,0 +1,41 @@
+
+%Hnc=reshape(Hnc', nm, 1);
+
+%% Finding mathcal{K}^* from P...
+
+rhn=1./hnc;
+rHn=zeros(nm);
+%Hu2=zeros(nm);
+
+dHu=diag(huc);
+for ii=1:nm  
+rHn(:,ii)=rhn;
+end
+WH=(rHn*dHu); % WH is a M by N matrix with entries WH_ji=u_i/v_j 
+
+
+Kstar=(P'.*WH);
+%invP2=invP;
+
+%% Laplacian via FD scheme 
+
+%fb=[f([b(:, 1), b(:, 2)]),b(:,3), b(:,4),b(:,5),b(:,6)]; 
+
+tic
+Lu=wlap_tb_nb2(b, Huc, Huh, Huv, bc);
+%Lu2=wlap_nbc2(b, Hu);
+Ln=wlap_tb_nb2(b, Hnc, Hnh, Hnv, bc);
+%Ln=eye(nm);
+toc
+
+CalL=1/2*(Lu+P*Ln*Kstar);
+Lnn=P*Lu*Kstar;
+
+%% Eigenfunction Calulate + extract
+tic
+if bad==1;
+        [V,D]=eigs(Lu, ed, 'LR');
+else
+       [V,D]=eigs(CalL, ed, 'LR');
+end
+toc
